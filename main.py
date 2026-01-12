@@ -28,8 +28,7 @@ def main():
 
     # B) Bizim Yöntemimiz (Graph-Based)
     # SLIC süper piksel sayısı grafiğin düğüm sayısını belirler
-    benchmarker.run_spectral_slic(n_segments=400, compactness=30)
-
+    benchmarker.run_spectral_slic(n_segments=2000, compactness=20, n_clusters=4)
     # 3. SONUÇLARI GÖRSELLEŞTİR VE KIYASLA
     plot_results(img, benchmarker.results, benchmarker.timings)
 

@@ -36,27 +36,46 @@ class SegmentationBenchmarker:
         print(f"Tamamlandı. Süre: {duration:.4f} sn")
         return out_img
 
-    def run_spectral_slic(self, n_segments=300, compactness=20):
+    def run_spectral_slic(self, n_segments=300, compactness=20, n_clusters=3):
         """
-        Graph-Based Segmentation (Bizim Yöntem - SLIC + Normalized Cuts)
-        Karmaşık Ağ Teorisi kullanır.
+        Graph-Based Segmentation (Bizim Yöntem - SLIC + Spectral Clustering)
+        Karmaşık Ağ Teorisi kullanır. Resmi zorla 'n_clusters' kadar parçaya böler.
         """
         print(f"--- Graph-Based Spectral (Segments={n_segments}) Çalıştırılıyor ---")
         start_time = time.time()
 
         # 1. Adım: SLIC ile Süper Pikseller (Düğüm Sayısını Azaltma)
-        labels = segmentation.slic(self.img, compactness=compactness, n_segments=n_segments, start_label=1)
+        # Bu işlem resmi küçük mozaiklere böler
+        labels = segmentation.slic(self.img, compactness=compactness, n_segments=n_segments, start_label=0)
 
-        # 2. Adım: Region Adjacency Graph (RAG) Oluşturma
+        # 2. Adım: Region Adjacency Graph  Oluşturma
         # Düğümler = Süper Pikseller, Kenarlar = Renk Benzerliği
         g = graph.rag_mean_color(self.img, labels)
 
-        # 3. Adım: Normalized Cuts ile Ağı Kesme
-        # Bu fonksiyon Laplacian matrisi işlemlerini arka planda yapar
-        labels_new = graph.cut_normalized(labels, g)
+        # 3. Adım: Spektral Kümeleme
+        # Grafiğin komşuluk matrisini (affinity matrix) alıyoruz
+        # Bu matris, hangi parçaların birbirine benzediğini matematiksel olarak tutar.
+        import networkx as nx
+        affinity_matrix = nx.to_scipy_sparse_array(g, format='csr')
+
+        affinity_matrix.indices = affinity_matrix.indices.astype(np.int32)
+        affinity_matrix.indptr = affinity_matrix.indptr.astype(np.int32)
+
+        # Matrisi Spektral Kümeleme algoritmasına sokuyoruz
+        # assign_labels='discretize' genellikle görüntü işlemede daha kararlı sonuç verir
+        sc = spectral_clustering(affinity_matrix, n_clusters=n_clusters, eigen_solver='arpack',
+                                 assign_labels='discretize', random_state=42)
+
+        # Spektral kümeleme bize süper piksellerin hangi gruba ait olduğunu verir (0, 1, 2...)
+        # Şimdi bu etiketleri orijinal resme geri yansıtmamız lazım.
+
+        # Yeni etiket haritası oluştur
+        labels_new = labels.copy()
+        for i, cluster_label in enumerate(sc):
+            labels_new[labels == i] = cluster_label
 
         # Sonucu görselleştir
-        out_img = color.label2rgb(labels_new, self.img, kind='avg', bg_label=0)
+        out_img = color.label2rgb(labels_new, self.img, kind='avg', bg_label=-1)
 
         duration = time.time() - start_time
         self.results['Graph-Based'] = out_img
