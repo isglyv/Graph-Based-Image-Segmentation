@@ -1,56 +1,69 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.feature_extraction import image
-from sklearn.cluster import spectral_clustering
-from skimage.transform import resize
-from skimage import data
+from skimage import data, transform
+import numpy as np
+from algorithms import SegmentationBenchmarker  # Az önce oluşturduğumuz dosyayı çağırıyoruz
 
-# 1. Veri Yükleme ve Ön İşleme (Downsampling )
-# Örnek olarak scikit-image içindeki 'coins'resmini kullanıyoruz.
-original_img = data.coins()
 
-# İşlem maliyetini düşürmek için resmi küçültüyoruz
-# Orijinal boyutun %20'si.
-res_factor = 0.20
-img_small = resize(original_img, (int(original_img.shape[0] * res_factor),
-                                  int(original_img.shape[1] * res_factor)),
-                   anti_aliasing=True)
+def main():
+    print("=== Karmaşık Ağlar Projesi: Görüntü Bölütleme Analizi ===")
 
-# Görüntüyü 0-1 arasına normalize et
-img_small = img_small / np.max(img_small)
+    # 1. VERİ SEÇİMİ
+    # Kahve fincanı resmi, doku ve kontrast açısından iyi bir testtir.
+    original_img = data.coffee()
 
-print(f"İşlenen görüntü boyutu: {img_small.shape}")
+    # İşlem hızını artırmak için biraz küçültelim (Opsiyonel)
+    img = transform.resize(original_img, (400, 600), anti_aliasing=True)
+    # 0-255 arasına çekelim (Scikit-image bazen 0-1 döndürür)
+    if img.max() <= 1.0:
+        img = (img * 255).astype(np.uint8)
 
-# 2. Görüntüden Graph Oluşturma
-# Pikselleri düğümlere, parlaklık farklarını kenar ağırlıklarına çevirir.
-# Bu fonksiyon sunumdaki W matrisinin temelini oluşturur.
-graph = image.img_to_graph(img_small)
+    # Benchmarker sınıfını başlat
+    benchmarker = SegmentationBenchmarker(img)
 
-# Ağırlıklar, piksel benzerliğine göre (gradient) atanır
-# W = e^(-grad / beta) formülüne benzer bir işlem
-beta = 5
-eps = 1e-6
-graph.data = np.exp(-beta * graph.data / graph.data.std()) + eps
+    # 2. DENEYLERİ ÇALIŞTIR
 
-# 3. Spektral Kümeleme (N-Cuts Uygulaması)
-# eigen_solver='arpack' kullanarak Laplacian matrisinin özdeğerlerini çözer
-N_REGIONS = 2 # Resmi kaç parçaya böleceğiz?
+    # A) Klasik Yöntem (K-Means)
+    # 3 gruba ayır (Örn: Fincan, Tabak, Arka Plan)
+    benchmarker.run_kmeans(n_clusters=3)
 
-print("Spektral kümeleme hesaplanıyor... (Biraz zaman alabilir)")
-labels = spectral_clustering(graph, n_clusters=N_REGIONS, eigen_solver='arpack')
+    # B) Bizim Yöntemimiz (Graph-Based)
+    # SLIC süper piksel sayısı grafiğin düğüm sayısını belirler
+    benchmarker.run_spectral_slic(n_segments=400, compactness=30)
 
-# Etiketleri resim boyutuna geri döndür 
-segmented_img = labels.reshape(img_small.shape)
+    # 3. SONUÇLARI GÖRSELLEŞTİR VE KIYASLA
+    plot_results(img, benchmarker.results, benchmarker.timings)
 
-# 4. Sonuçları Görselleştirme
-fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-ax[0].imshow(img_small, cmap='gray')
-ax[0].set_title('Orijinal (Küçültülmüş)')
-ax[0].axis('off')
 
-ax[1].imshow(segmented_img, cmap='viridis')
-ax[1].set_title(f'Bölütlenmiş Görüntü (N-Cuts, k={N_REGIONS})')
-ax[1].axis('off')
+def plot_results(original, results, timings):
+    """
+    Sonuçları yan yana profesyonel bir grafikte gösterir.
+    """
+    fig, axes = plt.subplots(1, 3, figsize=(15, 6))
 
-plt.tight_layout()
-plt.show()
+    # Orijinal Resim
+    axes[0].imshow(original)
+    axes[0].set_title("Orijinal Görüntü\n(Input)", fontsize=12, fontweight='bold')
+    axes[0].axis('off')
+
+    # K-Means Sonucu
+    t_kmeans = timings['K-Means']
+    axes[1].imshow(results['K-Means'])
+    axes[1].set_title(f"Klasik Yöntem: K-Means\nSüre: {t_kmeans:.2f} sn", fontsize=12)
+    axes[1].set_xlabel("Sadece renk kümelemesi yapar.\nUzamsal ilişkiyi bilmez.", fontsize=9)
+    axes[1].set_xticks([])
+    axes[1].set_yticks([])
+
+    # Graph-Based Sonucu
+    t_graph = timings['Graph-Based']
+    axes[2].imshow(results['Graph-Based'])
+    axes[2].set_title(f"Proje Yöntemi: Graph-Based (N-Cuts)\nSüre: {t_graph:.2f} sn", fontsize=12, color='darkblue')
+    axes[2].set_xlabel("Ağ teorisi kullanır.\nNesne bütünlüğünü korur.", fontsize=9)
+    axes[2].set_xticks([])
+    axes[2].set_yticks([])
+
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()
