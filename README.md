@@ -37,8 +37,7 @@ We compared the **Graph-Based** approach against **K-Means**.
 
 ### Visual Comparison
 
-![Comparison Result](assets/result_comparison.png)
-*(Place your generated comparison image here, e.g., inside an 'assets' folder)*
+<img width="1466" height="493" alt="Ekran Resmi 2026-01-12 11 37 48" src="https://github.com/user-attachments/assets/bf993732-6d2c-4376-8ddf-5cb0c3eb5214" />
 
 > **Observation:** As seen above, K-Means fails to distinguish shadows from objects, creating noise. The Graph-Based method preserves object integrity (the cup and the plate) as unified regions.
 
@@ -46,7 +45,7 @@ We compared the **Graph-Based** approach against **K-Means**.
 
 ## 🧪 Mathematical Background
 
-The project relies on the **Normalized Cut** criterion proposed by Shi & Malik (2000).
+The project relies on the **Normalized Cut** criterion proposed by Shi & Malik.
 
 **1. Affinity Matrix ($W$):**
 We calculate the weight between two nodes $i$ and $j$ based on color and spatial proximity:
@@ -64,7 +63,7 @@ The segmentation is then derived from the **Eigenvectors** of this matrix (Spect
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/YOUR_USERNAME/GraphVision.git](https://github.com/YOUR_USERNAME/GraphVision.git)
+    git clone [https://github.com/isglyv/GraphVision.git](https://github.com/isglyv/GraphVision.git)
     cd GraphVision
     ```
 
